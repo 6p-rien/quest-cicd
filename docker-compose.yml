@@ -1,11 +1,19 @@
-name: quest-compose
+name: quest
 
 services:
   mysql:
     image: mysql:8.0.45
     container_name: quest-mysql
+
     environment:
       MYSQL_ROOT_PASSWORD: root
+
+    volumes:
+      - ./quest-init.sql:/docker-entrypoint-initdb.d/init.sql
+      - mysql_data:/var/lib/mysql
+
+    networks:
+      - quest
 
     healthcheck:
       test: [ "CMD", "mysqladmin", "ping", "-h", "localhost" ]
@@ -13,20 +21,18 @@ services:
       retries: 10
       interval: 5s
 
-    volumes:
-      - db_data:/var/lib/mysql
-      - ./quest-init.sql:/docker-entrypoint-initdb.d/setup.sql
-
-    networks:
-      - quest-net
-
-  boot:
-    build:
-      context: quest-boot
+  java:
+    image: ajc/quest-boot
     container_name: quest-boot
 
+    networks:
+      - quest
+
+    ports:
+      - 8080:8080
+
     environment:
-      SPRING_DATASOURCE_URL: jdbc:mysql://mysql/quest
+      SPRING_DATASOURCE_URL: jdbc:mysql://quest-mysql:3306/projet_quest
       SPRING_DATASOURCE_USERNAME: root
       SPRING_DATASOURCE_PASSWORD: root
 
@@ -34,27 +40,23 @@ services:
       mysql:
         condition: service_healthy
 
-    networks:
-      - quest-net
-
   angular:
-    build:
-      context: quest-angular
+    image: ajc/quest-angular
     container_name: quest-angular
+
+    networks:
+      - quest
 
     ports:
       - 80:80
 
     depends_on:
-      - boot
-
-    networks:
-      - quest
-
-volumes:
-  db_data:
-    name: quest-db-data
+      - java
 
 networks:
-  quest-net:
+  quest:
     name: quest
+
+volumes:
+  mysql_data:
+    name: quest-mysql-data
